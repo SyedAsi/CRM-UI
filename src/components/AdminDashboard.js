@@ -12,6 +12,8 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showUsersWithServices, setShowUsersWithServices] = useState(false);
+  const [usersWithServices, setUsersWithServices] = useState([]);
 
   useEffect(() => {
     const userStr = sessionStorage.getItem('loggedInUser');
@@ -79,7 +81,7 @@ const AdminDashboard = () => {
   const addService = () => {
     setNewUser(prev => ({
       ...prev,
-      services: [...prev.services, { name: '', active: true, progress: 0 }]
+      services: [...prev.services, { name: '', active: true, progress: 0, totalAmount: 0, receivedAmount: 0 }]
     }));
   };
 
@@ -102,6 +104,19 @@ const AdminDashboard = () => {
   const addPresetUser = (preset) => {
     setNewUser(preset);
     setShowAddUser(true);
+  };
+
+  const handleViewUsersWithServices = async () => {
+    try {
+      setLoading(true);
+      const response = await UserService.getUsersWithServices();
+      setUsersWithServices(response.data);
+      setShowUsersWithServices(true);
+    } catch (error) {
+      setMessage('Error fetching users with services');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -150,7 +165,7 @@ const AdminDashboard = () => {
 
             {/* Quick Add Buttons */}
             <div style={styles.quickActions}>
-              <h3 style={styles.sectionTitle}>Quick Add Users</h3>
+              <h3 style={styles.sectionTitle}>Quick Actions</h3>
               <div style={styles.buttonGroup}>
                 <button 
                   onClick={() => addPresetUser({
@@ -169,16 +184,81 @@ const AdminDashboard = () => {
                     password: 'password123',
                     hasServices: true,
                     services: [
-                      { name: 'Internet Service', active: true, progress: 0 },
-                      { name: 'Cable TV', active: false, progress: 25 }
+                      { name: 'Internet Service', active: true, progress: 100, totalAmount: 5000, receivedAmount: 2000 },
+                      { name: 'Cable TV', active: false, progress: 25, totalAmount: 3000, receivedAmount: 0 }
                     ]
                   })}
                   style={styles.presetBtn}
                 >
                   Add John Doe (With Services)
                 </button>
+                <button 
+                  onClick={handleViewUsersWithServices}
+                  disabled={loading}
+                  style={{...styles.presetBtn, background: '#8b5cf6'}}
+                >
+                  {loading ? 'Loading...' : 'View All Users with Services'}
+                </button>
               </div>
             </div>
+
+            {/* Users with Services View */}
+            {showUsersWithServices && (
+              <div style={styles.section}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                  <h3 style={styles.sectionTitle}>All Users with Services</h3>
+                  <button 
+                    onClick={() => setShowUsersWithServices(false)}
+                    style={{...styles.toggleBtn, background: '#ef4444'}}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div style={styles.usersGrid}>
+                  {usersWithServices.map((userWithService, index) => (
+                    <div key={index} style={styles.userCard}>
+                      <h4 style={styles.userName}>{userWithService.userDTO.name}</h4>
+                      {userWithService.serviceDTO ? (
+                        <div>
+                          <p style={styles.serviceCount}>
+                            {userWithService.serviceDTO.services.length} Service(s)
+                          </p>
+                          {userWithService.serviceDTO.services.map((service, serviceIndex) => (
+                            <div key={serviceIndex} style={styles.serviceCard}>
+                              <div style={styles.serviceHeader}>
+                                <span style={styles.serviceName}>{service.name}</span>
+                                <span style={{
+                                  ...styles.statusBadge,
+                                  background: service.active ? '#10b981' : '#6b7280'
+                                }}>
+                                  {service.active ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              <div style={styles.progressBar}>
+                                <div style={{
+                                  ...styles.progressFill,
+                                  width: `${service.progress}%`
+                                }}></div>
+                              </div>
+                              <p style={styles.progressText}>{service.progress}% Complete</p>
+                              {service.totalAmount && (
+                                <div style={styles.amountInfo}>
+                                  <span>Total: ₹{service.totalAmount}</span>
+                                  <span>Received: ₹{service.receivedAmount || 0}</span>
+                                  <span>Balance: ₹{(service.totalAmount || 0) - (service.receivedAmount || 0)}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={styles.noServices}>No services assigned</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Add Custom User */}
             <div style={styles.section}>
@@ -236,13 +316,16 @@ const AdminDashboard = () => {
 
                       {newUser.services.map((service, index) => (
                         <div key={index} style={styles.serviceItem}>
-                          <input
-                            type="text"
-                            value={service.name}
-                            onChange={(e) => updateService(index, 'name', e.target.value)}
-                            placeholder="Service name"
-                            style={styles.serviceInput}
-                          />
+                          <div style={styles.serviceField}>
+                            <label style={styles.serviceLabel}>Service Name:</label>
+                            <input
+                              type="text"
+                              value={service.name}
+                              onChange={(e) => updateService(index, 'name', e.target.value)}
+                              placeholder="Service name"
+                              style={styles.serviceInput}
+                            />
+                          </div>
                           <label style={styles.serviceCheckbox}>
                             <input
                               type="checkbox"
@@ -251,15 +334,40 @@ const AdminDashboard = () => {
                             />
                             Active
                           </label>
-                          <input
-                            type="number"
-                            value={service.progress}
-                            onChange={(e) => updateService(index, 'progress', parseInt(e.target.value) || 0)}
-                            min="0"
-                            max="100"
-                            placeholder="Progress"
-                            style={styles.progressInput}
-                          />
+                          <div style={styles.serviceField}>
+                            <label style={styles.serviceLabel}>Progress (%):</label>
+                            <input
+                              type="number"
+                              value={service.progress}
+                              onChange={(e) => updateService(index, 'progress', parseInt(e.target.value) || 0)}
+                              min="0"
+                              max="100"
+                              placeholder="Progress"
+                              style={styles.progressInput}
+                            />
+                          </div>
+                          <div style={styles.serviceField}>
+                            <label style={styles.serviceLabel}>Total Amount:</label>
+                            <input
+                              type="number"
+                              value={service.totalAmount || 0}
+                              onChange={(e) => updateService(index, 'totalAmount', parseInt(e.target.value) || 0)}
+                              min="0"
+                              placeholder="Total Amount"
+                              style={styles.progressInput}
+                            />
+                          </div>
+                          <div style={styles.serviceField}>
+                            <label style={styles.serviceLabel}>Received Amount:</label>
+                            <input
+                              type="number"
+                              value={service.receivedAmount || 0}
+                              onChange={(e) => updateService(index, 'receivedAmount', parseInt(e.target.value) || 0)}
+                              min="0"
+                              placeholder="Received Amount"
+                              style={styles.progressInput}
+                            />
+                          </div>
                           <button 
                             onClick={() => removeService(index)}
                             style={styles.removeBtn}
@@ -494,15 +602,26 @@ const styles = {
     fontSize: '12px',
   },
   serviceItem: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr 120px 120px 120px 80px',
     gap: '0.5rem',
-    alignItems: 'center',
+    alignItems: 'start',
     marginBottom: '0.5rem',
-    flexWrap: 'wrap',
+    padding: '0.5rem',
+    background: '#f9fafb',
+    borderRadius: '6px',
+  },
+  serviceField: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  serviceLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#374151',
   },
   serviceInput: {
-    flex: 1,
-    minWidth: '150px',
     padding: '8px',
     border: '1px solid #e5e7eb',
     borderRadius: '6px',
@@ -516,7 +635,7 @@ const styles = {
     color: '#374151',
   },
   progressInput: {
-    width: '80px',
+    width: '100%',
     padding: '8px',
     border: '1px solid #e5e7eb',
     borderRadius: '6px',
@@ -544,6 +663,80 @@ const styles = {
   submitBtnDisabled: {
     background: '#9ca3af',
     cursor: 'not-allowed',
+  },
+  usersGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gap: '1rem',
+  },
+  userCard: {
+    background: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    padding: '1rem',
+  },
+  userName: {
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    color: '#1f2937',
+    margin: '0 0 0.5rem 0',
+  },
+  serviceCount: {
+    fontSize: '0.9rem',
+    color: '#6b7280',
+    margin: '0 0 1rem 0',
+  },
+  serviceCard: {
+    background: 'white',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    padding: '0.75rem',
+    marginBottom: '0.5rem',
+  },
+  serviceHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '0.5rem',
+  },
+  serviceName: {
+    fontWeight: 600,
+    color: '#1f2937',
+  },
+  statusBadge: {
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '0.75rem',
+    color: 'white',
+    fontWeight: 600,
+  },
+  progressBar: {
+    height: '8px',
+    background: '#e5e7eb',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    marginBottom: '0.25rem',
+  },
+  progressFill: {
+    height: '100%',
+    background: '#06b6d4',
+    transition: 'width 0.3s ease',
+  },
+  progressText: {
+    fontSize: '0.8rem',
+    color: '#6b7280',
+    margin: '0 0 0.5rem 0',
+  },
+  amountInfo: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '0.75rem',
+    color: '#374151',
+  },
+  noServices: {
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    margin: 0,
   },
 };
 

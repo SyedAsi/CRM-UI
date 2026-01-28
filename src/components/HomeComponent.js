@@ -34,9 +34,9 @@ const Dashboard = () => {
         UserService.getUserServices(user.id)
           .then((response) => {
             console.log("Fetched userServices:", response.data);
-            // Handle the response structure: response.data[0].service or response.data.services
-            const services = response.data.services || [];
-            setUserServices(services);
+            // Handle the response structure: response.data has id and services array
+            // We need to keep the full response.data structure to preserve the ID
+            setUserServices([response.data]); // Wrap in array since response.data is the service object with id
           })
           .catch((error) => {
             console.error("Error fetching userServices:", error);
@@ -72,7 +72,7 @@ const Dashboard = () => {
       case 'Projects':
         return <ProjectsContent />;
       case 'Pricing':
-        return <PricingContent />;
+        return <PricingContent userServices={userServices} setUserServices={setUserServices} />;
       default:
         return <DashboardContent userServices={userServices} setActivePage={setActivePage} />;
     }
@@ -185,41 +185,76 @@ const DashboardContent = ({ userServices, setActivePage }) => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.8rem' }}>
         {userServices && userServices.length > 0 ? (
           userServices.map((serviceData, index) => {
-            // Handle both flat and nested service structures
-            const service = serviceData.services || serviceData;
-            
-            return (
-              <div key={index} className="card" style={{ padding: '2rem', textAlign: 'center', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', transition: 'all 0.4s', cursor: 'pointer' }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-12px) scale(1.05)'; e.currentTarget.style.boxShadow = '0 25px 50px rgba(0,0,0,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)' }}
-              >
-                <div style={{ width: '80px', height: '80px', background: service.bg || '#f3f4f6', borderRadius: '50%', margin: '0 auto 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <i data-lucide={service.icon || 'box'}></i>
+            // serviceData now has the structure: {id: "...", services: [...]}
+            if (serviceData.services && Array.isArray(serviceData.services)) {
+              return serviceData.services.map((service, serviceIndex) => (
+                <div key={`${index}-${serviceIndex}`} className="card" style={{ padding: '2rem', textAlign: 'center', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', transition: 'all 0.4s', cursor: 'pointer' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-12px) scale(1.05)'; e.currentTarget.style.boxShadow = '0 25px 50px rgba(0,0,0,0.2)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)' }}
+                >
+                  <div style={{ width: '80px', height: '80px', background: service.bg || '#f3f4f6', borderRadius: '50%', margin: '0 auto 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i data-lucide={service.icon || 'box'}></i>
+                  </div>
+                  <h3>{service.name}</h3>
+                  <div style={{ height: '12px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', margin: '1rem 0' }}>
+                    <div style={{ width: `${service.progress}%`, height: '100%', background: service.color || '#06b6d4', transition: 'width 1.2s ease-out' }}></div>
+                  </div>
+                  <p style={{ fontWeight: 'bold', fontSize: '1.3rem' }}>{service.progress}% <span style={{ fontWeight: 'normal', color: '#6b7280', fontSize: '0.9rem' }}>Complete</span></p>
+                  {service.progress === 100 && (
+                    <button 
+                      onClick={() => setActivePage('Pricing')}
+                      style={{ 
+                        marginTop: '1rem', 
+                        padding: '0.75rem 1.5rem', 
+                        background: '#10b981', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer', 
+                        fontWeight: 600 
+                      }}
+                    >
+                      Make Payment
+                    </button>
+                  )}
                 </div>
-                <h3>{service.name}</h3>
-                <div style={{ height: '12px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', margin: '1rem 0' }}>
-                  <div style={{ width: `${service.progress}%`, height: '100%', background: service.color || '#06b6d4', transition: 'width 1.2s ease-out' }}></div>
+              ));
+            } else {
+              // Handle flat service structure (fallback)
+              const service = serviceData;
+              return (
+                <div key={index} className="card" style={{ padding: '2rem', textAlign: 'center', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', transition: 'all 0.4s', cursor: 'pointer' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-12px) scale(1.05)'; e.currentTarget.style.boxShadow = '0 25px 50px rgba(0,0,0,0.2)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)' }}
+                >
+                  <div style={{ width: '80px', height: '80px', background: service.bg || '#f3f4f6', borderRadius: '50%', margin: '0 auto 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i data-lucide={service.icon || 'box'}></i>
+                  </div>
+                  <h3>{service.name}</h3>
+                  <div style={{ height: '12px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', margin: '1rem 0' }}>
+                    <div style={{ width: `${service.progress}%`, height: '100%', background: service.color || '#06b6d4', transition: 'width 1.2s ease-out' }}></div>
+                  </div>
+                  <p style={{ fontWeight: 'bold', fontSize: '1.3rem' }}>{service.progress}% <span style={{ fontWeight: 'normal', color: '#6b7280', fontSize: '0.9rem' }}>Complete</span></p>
+                  {service.progress === 100 && (
+                    <button 
+                      onClick={() => setActivePage('Pricing')}
+                      style={{ 
+                        marginTop: '1rem', 
+                        padding: '0.75rem 1.5rem', 
+                        background: '#10b981', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer', 
+                        fontWeight: 600 
+                      }}
+                    >
+                      Make Payment
+                    </button>
+                  )}
                 </div>
-                <p style={{ fontWeight: 'bold', fontSize: '1.3rem' }}>{service.progress}% <span style={{ fontWeight: 'normal', color: '#6b7280', fontSize: '0.9rem' }}>Complete</span></p>
-                {service.progress === 100 && (
-                  <button 
-                    onClick={() => setActivePage('Pricing')}
-                    style={{ 
-                      marginTop: '1rem', 
-                      padding: '0.75rem 1.5rem', 
-                      background: '#10b981', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '8px', 
-                      cursor: 'pointer', 
-                      fontWeight: 600 
-                    }}
-                  >
-                    Make Payment
-                  </button>
-                )}
-              </div>
-            );
+              );
+            }
           })
         ) : (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
@@ -245,20 +280,221 @@ const ProjectsContent = () => (
 
 
 
-const PricingContent = () => (
-  <>
-    <h1>Pricing Plans</h1>
-    <table className="pricing-table" style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
-      <thead>
-        <tr><th>Plan</th><th>Price</th><th>Features</th><th></th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Basic</td><td>$99/mo</td><td>5 Projects, Email Support</td><td><button className="btn">Choose</button></td></tr>
-        <tr><td>Pro</td><td>$299/mo</td><td>Unlimited Projects, Priority Support</td><td><button className="btn">Choose</button></td></tr>
-        <tr><td>Enterprise</td><td>Custom</td><td>Dedicated Manager, API Access</td><td><button className="btn">Contact</button></td></tr>
-      </tbody>
-    </table>
-  </>
-);
+const PricingContent = ({ userServices, setUserServices }) => {
+  const [services, setServices] = React.useState(userServices || []);
+
+  React.useEffect(() => {
+    setServices(userServices || []);
+  }, [userServices]);
+
+  React.useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => document.body.removeChild(script);
+  }, []);
+
+  const updateReceivedAmount = async (serviceData, service, newReceivedAmount) => {
+    try {
+      console.log('ServiceData:', serviceData);
+      console.log('Service:', service);
+      console.log('ServiceData ID:', serviceData.id);
+      
+      const serviceId = serviceData.id || serviceData._id;
+      if (!serviceId) {
+        console.error('No service ID found in serviceData:', serviceData);
+        return;
+      }
+      
+      const url = `http://localhost:8080/api/v1/movies/services/${serviceId}/items/${encodeURIComponent(service.name)}/received-amount`;
+      console.log('Making PUT request to:', url);
+      console.log('Request body:', newReceivedAmount.toString());
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: newReceivedAmount.toString()
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (response.ok) {
+        console.log('API call successful, updating state');
+        // Update local state
+        setServices(prevServices => 
+          prevServices.map(prevServiceData => {
+            const prevServiceId = prevServiceData.id || prevServiceData._id;
+            if (prevServiceId === serviceId) {
+              return {
+                ...prevServiceData,
+                services: prevServiceData.services.map(s => 
+                  s.name === service.name 
+                    ? { ...s, receivedAmount: newReceivedAmount }
+                    : s
+                )
+              };
+            }
+            return prevServiceData;
+          })
+        );
+        
+        // Update parent state as well
+        setUserServices(prevServices => 
+          prevServices.map(prevServiceData => {
+            const prevServiceId = prevServiceData.id || prevServiceData._id;
+            if (prevServiceId === serviceId) {
+              return {
+                ...prevServiceData,
+                services: prevServiceData.services.map(s => 
+                  s.name === service.name 
+                    ? { ...s, receivedAmount: newReceivedAmount }
+                    : s
+                )
+              };
+            }
+            return prevServiceData;
+          })
+        );
+      } else {
+        const errorText = await response.text();
+        console.error('API call failed:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('Error updating received amount:', error);
+    }
+  };
+
+  const handlePayment = async (serviceData, service) => {
+    const balanceAmount = (service.totalAmount || 0) - (service.receivedAmount || 0);
+    
+    if (balanceAmount <= 0) {
+      alert('No balance amount to pay');
+      return;
+    }
+
+    // Check if Razorpay is loaded
+    if (!window.Razorpay) {
+      alert('Payment system is loading. Please try again in a moment.');
+      return;
+    }
+
+    const options = {
+      key: 'rzp_test_S5lywmFf4TJKCz',
+      amount: balanceAmount * 100,
+      currency: 'INR',
+      name: 'MarklenceMedia',
+      description: `Payment for ${service.name}`,
+      handler: async function (response) {
+        alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+        const newReceivedAmount = (service.receivedAmount || 0) + balanceAmount;
+        await updateReceivedAmount(serviceData, service, newReceivedAmount);
+      },
+      prefill: {
+        name: 'Customer Name',
+        email: 'customer@example.com',
+        contact: '9999999999'
+      },
+      theme: {
+        color: '#06b6d4'
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
+
+  return (
+    <>
+      <h1>Service Pricing</h1>
+      <table className="pricing-table" style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+        <thead>
+          <tr>
+            <th>Service Name</th>
+            <th>Total Amount</th>
+            <th>Received Amount</th>
+            <th>Balance Amount</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {services && services.length > 0 ? (
+            services.map((serviceData, index) => {
+              // serviceData now has the structure: {id: "...", services: [...]}
+              if (serviceData.services && Array.isArray(serviceData.services)) {
+                return serviceData.services.map((service, serviceIndex) => {
+                  const balanceAmount = (service.totalAmount || 0) - (service.receivedAmount || 0);
+                  
+                  return (
+                    <tr key={`${index}-${serviceIndex}`}>
+                      <td>{service.name}</td>
+                      <td>₹{service.totalAmount || 0}</td>
+                      <td>₹{service.receivedAmount || 0}</td>
+                      <td>₹{balanceAmount}</td>
+                      <td>
+                        {service.progress === 100 ? (
+                          <button 
+                            className="btn" 
+                            onClick={() => handlePayment(serviceData, service)}
+                            disabled={balanceAmount <= 0}
+                            style={{ 
+                              background: balanceAmount <= 0 ? '#9ca3af' : '#06b6d4',
+                              cursor: balanceAmount <= 0 ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {balanceAmount <= 0 ? 'Paid' : 'Pay Now'}
+                          </button>
+                        ) : (
+                          <span style={{ color: '#6b7280' }}>Service in progress</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                });
+              } else {
+                // Handle flat service structure (fallback)
+                const service = serviceData;
+                const balanceAmount = (service.totalAmount || 0) - (service.receivedAmount || 0);
+                
+                return (
+                  <tr key={index}>
+                    <td>{service.name}</td>
+                    <td>₹{service.totalAmount || 0}</td>
+                    <td>₹{service.receivedAmount || 0}</td>
+                    <td>₹{balanceAmount}</td>
+                    <td>
+                      {service.progress === 100 ? (
+                        <button 
+                          className="btn" 
+                          onClick={() => handlePayment(serviceData, service)}
+                          disabled={balanceAmount <= 0}
+                          style={{ 
+                            background: balanceAmount <= 0 ? '#9ca3af' : '#06b6d4',
+                            cursor: balanceAmount <= 0 ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          {balanceAmount <= 0 ? 'Paid' : 'Pay Now'}
+                        </button>
+                      ) : (
+                        <span style={{ color: '#6b7280' }}>Service in progress</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              }
+            })
+          ) : (
+            <tr>
+              <td colSpan="5" style={{ textAlign: 'center', color: '#6b7280' }}>No services available</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </>
+  );
+};
 
 export default Dashboard;
